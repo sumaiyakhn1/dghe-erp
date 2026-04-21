@@ -1,14 +1,14 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileUp, FolderUp, MousePointerClick, X } from 'lucide-react';
+import { FileUp, FolderUp, MousePointerClick, X } from 'lucide-react';
 import { parseExcelFile } from '../utils/excelUtils';
 
 interface FileUploadProps {
   onDataLoaded: (headers: string[], data: any[], fileName: string) => void;
-  onReset: () => void;
+  onReset?: () => void;
   fileName: string | null;
 }
 
-export const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, onReset, fileName }) => {
+export const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, fileName }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 

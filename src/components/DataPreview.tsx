@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Check, Loader2, PlayCircle, Eye, Edit3 } from 'lucide-react';
+import { Search, Check, Loader2, PlayCircle, Edit3 } from 'lucide-react';
 import { ERP_FIELDS, INITIAL_PAYLOAD_DEFAULTS } from '../constants/erpFields';
 import { formatExcelDate } from '../utils/excelUtils';
 import { addStudent } from '../utils/auth';
