@@ -6,18 +6,20 @@ export interface ERPField {
 }
 
 export const ERP_FIELDS: ERPField[] = [
-  { key: 'name', label: 'Name', required: true, autoMapKeywords: ['name', 'student', 'full name'] },
-  { key: 'fatherName', label: 'Father\'s Name', autoMapKeywords: ['father', 'parent'] },
-  { key: 'motherName', label: 'Mother\'s Name', autoMapKeywords: ['mother'] },
-  { key: 'dob', label: 'Date of Birth', autoMapKeywords: ['dob', 'birth', 'date'] },
+  { key: 'name', label: 'Student Name', required: true, autoMapKeywords: ['name', 'student', 'fullname'] },
+  { key: 'fatherName', label: 'Father\'s Name', required: true, autoMapKeywords: ['father', 'parent'] },
+  { key: 'motherName', label: 'Mother\'s Name', required: false, autoMapKeywords: ['mother'] },
+  { key: 'dob', label: 'Date of Birth', required: true, autoMapKeywords: ['dob', 'birth', 'date'] },
+  { key: 'regNo', label: 'Registration No', required: true, autoMapKeywords: ['reg', 'enrollment', 'roll', 'registration_id'] },
+  { key: 'course', label: 'Course', required: false, autoMapKeywords: ['course', 'degree'] },
+  { key: 'stream', label: 'Stream', required: false, autoMapKeywords: ['stream', 'branch'] },
+  { key: 'batch', label: 'Batch/Semester', required: false, autoMapKeywords: ['batch', 'year', 'semester'] },
+  { key: 'section', label: 'Section', required: false, autoMapKeywords: ['section'] },
+  { key: 'oldNew', label: 'oldNew (AIOC/BC)', required: true, autoMapKeywords: ['old', 'new', 'allocation', 'category', 'reservation'] },
+  { key: 'category', label: 'category (GIA/SFS)', required: false, autoMapKeywords: ['scheme', 'aided', 'sfs'] },
+  { key: 'gender', label: 'Gender', required: true, autoMapKeywords: ['gender', 'sex'] },
   { key: 'phone', label: 'Phone Number', required: true, autoMapKeywords: ['phone', 'mobile', 'contact'] },
-  { key: 'regNo', label: 'Registration No', required: true, autoMapKeywords: ['reg', 'enrollment', 'roll'] },
-  { key: 'course', label: 'Course', autoMapKeywords: ['course', 'degree'] },
-  { key: 'stream', label: 'Stream', autoMapKeywords: ['stream', 'branch'] },
-  { key: 'batch', label: 'Batch', autoMapKeywords: ['batch', 'year'] },
-  { key: 'section', label: 'Section', autoMapKeywords: ['section'] },
-  { key: 'gender', label: 'Gender', autoMapKeywords: ['gender', 'sex'] },
-  { key: 'category', label: 'Category', autoMapKeywords: ['category', 'caste'] },
+  { key: 'doa', label: 'Date of Admission', required: false, autoMapKeywords: ['doa', 'admission'] },
 ];
 
 export const INITIAL_PAYLOAD_DEFAULTS = {

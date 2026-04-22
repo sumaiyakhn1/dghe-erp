@@ -31,24 +31,24 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-[#17171a] border border-white/5 rounded-[2.5rem] p-12 w-full max-w-sm shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)]"
+      className="bg-white border border-black/5 rounded-[2.5rem] p-12 w-full max-w-sm shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)]"
     >
       <div className="flex flex-col items-center mb-10">
         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-600/20">
           <ShieldCheck className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-3xl font-black tracking-tight text-white">Auth</h2>
+        <h2 className="text-3xl font-black tracking-tight text-zinc-900">Auth</h2>
         <p className="text-zinc-500 text-sm font-medium mt-1">Personnel Authorization</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Personnel ID</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Personnel ID</label>
           <div className="relative group">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700 group-focus-within:text-blue-500 transition-colors" />
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-blue-500 transition-colors" />
             <input 
               type="text" 
-              className="w-full bg-[#0c0c0e] border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:outline-none focus:border-blue-500 transition-all placeholder:text-zinc-800"
+              className="w-full bg-zinc-50 border border-black/5 rounded-2xl py-4 pl-12 pr-4 text-zinc-900 font-bold focus:outline-none focus:border-blue-500 transition-all placeholder:text-zinc-300"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               required
@@ -57,12 +57,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Access Token</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Access Token</label>
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700 group-focus-within:text-blue-500 transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-blue-500 transition-colors" />
             <input 
               type="password" 
-              className="w-full bg-[#0c0c0e] border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:outline-none focus:border-blue-500 transition-all placeholder:text-zinc-800"
+              className="w-full bg-zinc-50 border border-black/5 rounded-2xl py-4 pl-12 pr-4 text-zinc-900 font-bold focus:outline-none focus:border-blue-500 transition-all placeholder:text-zinc-300"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -79,7 +79,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all shadow-xl shadow-blue-600/20"
+          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-200 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all shadow-xl shadow-blue-600/20"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin mx-auto" />

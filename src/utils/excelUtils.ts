@@ -35,18 +35,30 @@ export const formatExcelDate = (value: any): string => {
   if (value instanceof Date) {
     date = value;
   } else if (typeof value === 'number') {
-    // Excel numeric date
-    date = XLSX.SSF.parse_date_code(value) as unknown as Date;
-    // XLSX.SSF returns an object {y,m,d,H,M,S}, we convert to ISO string manually or use helper
     const d = XLSX.SSF.parse_date_code(value);
-    return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+    date = new Date(d.y, d.m - 1, d.d);
   } else {
-    date = new Date(value);
+    const dateStr = String(value).trim();
+    // Try standard parsing first
+    date = new Date(dateStr);
+    
+    // If invalid, try manual parsing for DD-MM-YYYY or DD/MM/YYYY
+    if (isNaN(date.getTime())) {
+      const parts = dateStr.split(/[-/]/);
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
+        if (y > 1000) { // Ensure it's a full year
+          date = new Date(y, m - 1, d);
+        }
+      }
+    }
   }
 
   if (isNaN(date.getTime())) return String(value);
 
-  return date.toISOString().split('T')[0];
+  return date.toISOString();
 };
 
 export const autoMapFields = (excelHeaders: string[], erpFields: any[]): Record<string, string> => {

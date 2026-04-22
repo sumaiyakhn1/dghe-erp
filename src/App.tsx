@@ -112,17 +112,18 @@ function App() {
           {isAuthenticated && (
             <div style={{ marginTop: 'auto', padding: '20px', borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={14} color="#888" />
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <User size={14} color="var(--text-muted)" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: 'white' }}>ADM_SYSTEM</span>
-                  <span style={{ fontSize: '9px', color: '#555' }}>ONLINE_ACTIVE</span>
+                  <span style={{ fontSize: '11px', fontWeight: 800 }}>ADM_SYSTEM</span>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>ONLINE_ACTIVE</span>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                style={{ width: '100%', padding: '10px', borderRadius: '10px', background: '#111', border: '1px solid var(--border)', color: '#888', fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}
+                className="btn-secondary"
+                style={{ width: '100%', fontSize: '11px' }}
               >
                 DISCONNECT
               </button>
@@ -156,7 +157,7 @@ function App() {
 
                 {activeStep === 'map' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-sidebar)', padding: '24px 32px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '24px 32px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                         <div style={{ width: '56px', height: '56px', background: 'var(--accent)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <FileSpreadsheet color="white" />
@@ -167,7 +168,7 @@ function App() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <button onClick={handleReset} style={{ background: '#111', border: '1px solid var(--border)', color: 'white', padding: '12px 20px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Change Source</button>
+                        <button onClick={handleReset} className="btn-secondary">Change Source</button>
                         <button
                           disabled={!isMappingValid()}
                           onClick={() => setActiveStep('preview')}
@@ -182,12 +183,12 @@ function App() {
                 )}
 
                 {activeStep === 'preview' && (
-                  <div style={{ background: 'var(--bg-sidebar)', borderRadius: '24px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                  <div style={{ background: 'var(--bg-card)', borderRadius: '24px', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }}>
                     <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <button onClick={() => setActiveStep('map')} style={{ background: 'transparent', border: 'none', color: '#888', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button onClick={() => setActiveStep('map')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> BACK TO MAPPING
                       </button>
-                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#444' }}>STAGING_BUFFER_v2</span>
+                      <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)' }}>STAGING_BUFFER_v2</span>
                     </div>
                     <DataPreview data={excelData} mappings={mappings} />
                   </div>

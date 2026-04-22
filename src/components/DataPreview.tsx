@@ -23,31 +23,65 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
     const initialized = data.map((rawRow) => {
       const student: any = {};
       
+      // 1. Basic Mapping from Excel for all fields
       ERP_FIELDS.forEach(field => {
         const excelHeader = mappings[field.key];
-        let value = excelHeader ? rawRow[excelHeader] : '';
+        const rawValue = excelHeader ? rawRow[excelHeader] : '';
         
-        // Data Normalization
-        if (field.key === 'gender' && value) {
-          const v = String(value).toUpperCase().trim();
-          if (v === 'F') value = 'FEMALE';
-          if (v === 'M') value = 'MALE';
+        // Explicitly convert to string and trim
+        student[field.key] = rawValue !== undefined && rawValue !== null ? String(rawValue).trim() : '';
+        
+        // Special cleanup for numeric phone/regNo strings that might have ".0" from Excel
+        if (['phone', 'regNo'].includes(field.key) && student[field.key].endsWith('.0')) {
+          student[field.key] = student[field.key].replace('.0', '');
         }
-
-        // Course Sanitization
-        if (field.key === 'course' && value) {
-          // Strip everything from the first parenthesis onwards
-          value = String(value).split('(')[0].trim();
-        }
-
-        if (field.key === 'dob' && value) value = formatExcelDate(value);
-        student[field.key] = value || '';
       });
 
-      // Business Logic Overrides
-      student.stream = student.course || '';
-      student.section = "A";
-      student.batch = "Sem 1";
+      // 2. Data Normalization & Specific Rules
+      
+      // Gender: normalize to full words if possible
+      // Gender: robust normalization to "Male" or "Female"
+      if (student.gender) {
+        const v = String(student.gender).toUpperCase().trim();
+        if (v.startsWith('F')) student.gender = 'Female';
+        else if (v.startsWith('M')) student.gender = 'Male';
+      } else {
+        student.gender = 'Male'; // Basic fallback if totally missing
+      }
+
+      // DOB/DOA Formatting
+      if (student.dob) student.dob = formatExcelDate(student.dob);
+      if (student.doa) student.doa = formatExcelDate(student.doa);
+      else student.doa = new Date().toISOString();
+
+      // 3. New Business Rules & Automated Logic
+      
+      // A. Mother's Name fallback
+      if (!student.motherName) student.motherName = 'NA';
+      
+      // B. Batch & Section defaults
+      if (!student.batch) student.batch = 'Sem 1';
+      if (!student.section) student.section = 'A';
+
+      // C. Category (Scheme) Logic: Fixed to "GIA Girls" for now as requested
+      student.category = 'GIA Girls';
+      
+      /* Complex Logic Commented Out for now:
+      const courseExcelHeader = mappings['course'];
+      const rawCourse = courseExcelHeader ? String(rawRow[courseExcelHeader] || '') : '';
+      const isFemale = student.gender === 'Female';
+      const isAided = rawCourse.toLowerCase().includes('aided');
+
+      if (isAided) {
+        student.category = isFemale ? 'GIA Girls' : 'GIA Boys';
+      } else {
+        student.category = isFemale ? 'SFS Girls' : 'SFS Boys';
+      }
+      */
+      
+      // D. Final Override: "course only bachelor of arts to further data" & "stream same as course"
+      student.course = 'Bachelor of Arts';
+      student.stream = 'Bachelor of Arts';
 
       return student;
     });
@@ -68,9 +102,6 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
     setWorkingData(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [key]: newValue };
-      // Keep stream synced with course IF it hasn't been manually diverged? 
-      // User said "stream is same as course", so let's keep it synced during edit of course
-      if (key === 'course') updated[index].stream = newValue;
       return updated;
     });
   };
@@ -92,7 +123,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '24px', overflow: 'hidden' }}>
       {/* Search Header */}
-      <div style={{ padding: '32px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.1)' }}>
+      <div style={{ padding: '32px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)' }}>
         <div>
            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '4px' }}>
               <Edit3 size={14} />
@@ -102,7 +133,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
         </div>
         
         <div style={{ position: 'relative', width: '300px' }}>
-          <Search size={16} color="#444" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
           <input 
             type="text" 
             placeholder="Search records..."
@@ -124,7 +155,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
                 <th key={field.key} style={{ whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <span>{field.label}</span>
-                    <span style={{ fontSize: '8px', color: '#444' }}>{field.key}</span>
+                    <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>{field.key}</span>
                   </div>
                 </th>
               ))}
@@ -132,8 +163,8 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
                 textAlign: 'right', 
                 position: 'sticky', 
                 right: 0, 
-                backgroundColor: 'var(--bg-card)', 
-                boxShadow: '-10px 0 20px rgba(0,0,0,0.3)',
+                backgroundColor: 'var(--bg-main)', 
+                boxShadow: '-4px 0 10px rgba(0,0,0,0.05)',
                 zIndex: 10
               }}>EXECUTION</th>
             </tr>
@@ -153,7 +184,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
                       transition: 'background 0.3s'
                     }}
                   >
-                    <td style={{ textAlign: 'center', color: '#444', fontFamily: 'monospace' }}>{originalIndex + 1}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{originalIndex + 1}</td>
                     {ERP_FIELDS.map(field => (
                       <td key={field.key} style={{ padding: '4px', minWidth: '120px' }}>
                         <input 
@@ -183,7 +214,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
                       position: 'sticky', 
                       right: 0, 
                       backgroundColor: 'var(--bg-card)', 
-                      boxShadow: '-10px 0 20px rgba(0,0,0,0.3)',
+                      boxShadow: '-4px 0 10px rgba(0,0,0,0.05)',
                       zIndex: 10
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 8px' }}>
@@ -224,8 +255,8 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
       </div>
       
       {/* Buffer Status */}
-      <div style={{ padding: '16px 32px', background: 'rgba(0,0,0,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <p style={{ fontSize: '10px', fontWeight: 800, color: '#444', margin: 0, letterSpacing: '1px' }}>B_BATCH_050</p>
+      <div style={{ padding: '16px 32px', background: 'var(--bg-main)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', margin: 0, letterSpacing: '1px' }}>B_BATCH_050</p>
          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)' }}></div>
             <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--accent)' }}>SYNC_READY</span>
