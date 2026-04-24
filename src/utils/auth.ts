@@ -65,8 +65,18 @@ export const addStudent = async (payload: any) => {
 
   return axios.post(ERP_API_URL, payload, {
     headers: {
-      'Authorization': token, // Pass as is (e.g. "Bearer eyJhb...")
+      'Authorization': token,
       'Content-Type': 'application/json'
     }
+  });
+};
+
+export const getCourses = async (entity: string, session: string) => {
+  const token = getAuthToken();
+  if (!token) throw new Error('Not authenticated');
+
+  return axios.get(`https://others-api.odpay.in/api/list/course`, {
+    params: { entity, session, isLEET: true },
+    headers: { 'Authorization': token }
   });
 };

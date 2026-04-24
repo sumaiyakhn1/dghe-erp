@@ -21,9 +21,9 @@ export const MappingSelector: React.FC<MappingSelectorProps> = ({ excelHeaders, 
           batch: "Sem 1",
           section: "A",
           course: "Bachelor of Arts",
-          stream: "Bachelor of Arts",
+          stream: "Same as Course",
           doa: "Current Date",
-          category: "GIA Girls"
+          category: "Auto GIA/SFS"
         };
         
         const defaultValue = autoDefaults[field.key];

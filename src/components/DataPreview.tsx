@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface DataPreviewProps {
   data: any[];
   mappings: Record<string, string>;
+  erpCourseInfo?: { name: string, stream: string } | null;
 }
 
-export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
+export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, erpCourseInfo }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusMap, setStatusMap] = useState<Record<number, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [errorMessages, setErrorMessages] = useState<Record<number, string>>({});
@@ -63,25 +64,25 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings }) => {
       if (!student.batch) student.batch = 'Sem 1';
       if (!student.section) student.section = 'A';
 
-      // C. Category (Scheme) Logic: Fixed to "GIA Girls" for now as requested
-      student.category = 'GIA Girls';
-      
-      /* Complex Logic Commented Out for now:
-      const courseExcelHeader = mappings['course'];
-      const rawCourse = courseExcelHeader ? String(rawRow[courseExcelHeader] || '') : '';
-      const isFemale = student.gender === 'Female';
-      const isAided = rawCourse.toLowerCase().includes('aided');
+      // C. Category (Scheme) Logic: Aggressive search for "AIDED" in the row
+      const searchStr = JSON.stringify(rawRow).toUpperCase();
+      const isFemale = String(student.gender || '').toLowerCase().includes('female');
+      const isAided = searchStr.includes('AIDED'); 
 
       if (isAided) {
         student.category = isFemale ? 'GIA Girls' : 'GIA Boys';
       } else {
         student.category = isFemale ? 'SFS Girls' : 'SFS Boys';
       }
-      */
       
-      // D. Final Override: "course only bachelor of arts to further data" & "stream same as course"
-      student.course = 'Bachelor of Arts';
-      student.stream = 'Bachelor of Arts';
+      // D. Final Override: Standardization for ERP Target
+      if (erpCourseInfo) {
+        student.course = erpCourseInfo.name;
+        student.stream = erpCourseInfo.stream;
+      } else {
+        if (!student.course) student.course = 'Bachelor of Arts';
+        student.stream = student.course;
+      }
 
       return student;
     });
