@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { Loader2, ArrowLeft, Save, CheckCircle2, FileSpreadsheet } from 'lucide-react';
+import React, { useState } from 'react';
+import { Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react';
 import { saveEntityMapping } from '../utils/auth';
 import type { Entity } from '../utils/auth';
-import { parseExcelFile } from '../utils/excelUtils';
+
 
 interface MappingSetupProps {
   entity: Entity;
@@ -25,17 +25,14 @@ const ERP_FIELDS = [
 ];
 
 export const MappingSetup: React.FC<MappingSetupProps> = ({ entity, onBack, onMappingSaved }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
   // State for sample excel upload
-  const [sampleHeaders, setSampleHeaders] = useState<string[]>(
+  const [sampleHeaders] = useState<string[]>(
     entity.sampleHeaders && entity.sampleHeaders.length > 0 
       ? entity.sampleHeaders 
       : ["SrNo.", "College", "Course Name", "Registration_Id", "StudentFullName", "Father Name", "MobileNo", "Gender", "DOB", "Reservation Category", "Seat Allocation Category", "12th %", "Weightage", "Total Marks"]
   );
-  const [sampleFileName, setSampleFileName] = useState<string | null>("Standard Template");
-  const [sampleData, setSampleData] = useState<any[]>([]);
-  const [parsing, setParsing] = useState(false);
+  const [sampleFileName] = useState<string | null>("Standard Template");
+  const [sampleData] = useState<any[]>([]);
   
   // mapping: { erpKey -> excelHeader }
   const [mapping, setMapping] = useState<Record<string, string>>(() => {
@@ -64,7 +61,7 @@ export const MappingSetup: React.FC<MappingSetupProps> = ({ entity, onBack, onMa
   });
   const [valueMappings, setValueMappings] = useState<Record<string, Record<string, string>>>(entity.valueMappings || {});
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [activeValueMapField, setActiveValueMapField] = useState<string | null>(null);
 
   const [feeMasterOptions, setFeeMasterOptions] = useState<{ category: string[], oldNew: string[] } | null>(null);
@@ -85,39 +82,6 @@ export const MappingSetup: React.FC<MappingSetupProps> = ({ entity, onBack, onMa
     fetchOptions();
   }, [entity]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setParsing(true);
-      const { headers, data } = await parseExcelFile(file);
-      setSampleHeaders(headers);
-      setSampleData(data);
-      setSampleFileName(file.name);
-      
-      // Auto-map if possible
-      const newMap = { ...mapping };
-      ERP_FIELDS.forEach(field => {
-        if (!newMap[field.key]) {
-          if (field.autoTarget && field.defaultOption) {
-            newMap[field.key] = `__CUSTOM__:${field.defaultOption}`;
-          } else {
-            const match = headers.find(h => {
-              const lowerHeader = h.toLowerCase();
-              return field.autoMapKeywords.some(keyword => lowerHeader.includes(keyword.toLowerCase()));
-            });
-            if (match) newMap[field.key] = match;
-          }
-        }
-      });
-      setMapping(newMap);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to parse sample Excel file. Please ensure it is a valid .xlsx or .xls file.");
-    } finally {
-      setParsing(false);
-    }
-  };
 
   const handleSelectField = (erpKey: string, excelHeader: string) => {
     setMapping(prev => ({
