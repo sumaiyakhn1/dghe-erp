@@ -191,3 +191,12 @@ export const markStudentAsPushed = async (fileId: string, regNo: string) => {
   });
   return res.data;
 };
+
+export const saveFileConfig = async (fileId: string, courseId: string, category: string) => {
+  const token = getAuthToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await axios.put(`/api/files/${fileId}/config`, { courseId, category }, {
+    headers: { 'Authorization': token }
+  });
+  return res.data;
+};

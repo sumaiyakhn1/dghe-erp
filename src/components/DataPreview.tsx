@@ -12,16 +12,16 @@ interface DataPreviewProps {
   valueMappings?: Record<string, Record<string, string>>;
   erpCourseInfo?: { name: string, stream: string } | null;
   globalCategory?: string;
-  activeFileId?: string | null;
+  activeFileIds?: string[];
   pushedRegistrationNumbers?: string[];
   onStudentPushed?: (regNo: string) => void;
 }
 
-export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueMappings, erpCourseInfo, globalCategory, activeFileId, pushedRegistrationNumbers = [], onStudentPushed }) => {
+export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueMappings, erpCourseInfo, globalCategory, activeFileIds = [], pushedRegistrationNumbers = [], onStudentPushed }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusMap, setStatusMap] = useState<Record<number, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [errorMessages, setErrorMessages] = useState<Record<number, string>>({});
-  
+
   // workingData stores the ACTUAL VALUES for each student, not just the excel row
   const [workingData, setWorkingData] = useState<any[]>([]);
 
@@ -29,7 +29,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
   useEffect(() => {
     const initialized = data.map((rawRow) => {
       const student: any = {};
-      
+
       // 1. Basic Mapping from Excel for all fields
       ERP_FIELDS.forEach(field => {
         const mappedHeader = mappings[field.key];
@@ -42,16 +42,16 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
             rawValue = 'NA';
           } else if (mappedHeader !== 'ignore') {
             rawValue = rawRow[mappedHeader] !== undefined && rawRow[mappedHeader] !== null ? String(rawRow[mappedHeader]).trim() : '';
-            
+
             // Check if there is a configured value mapping for this specific rawValue
             if (valueMappings && valueMappings[field.key] && valueMappings[field.key][rawValue]) {
               rawValue = valueMappings[field.key][rawValue];
             }
           }
         }
-        
+
         student[field.key] = rawValue;
-        
+
         // Special cleanup for numeric phone/regNo strings that might have ".0" from Excel
         if (['phone', 'regNo'].includes(field.key) && student[field.key].endsWith('.0')) {
           student[field.key] = student[field.key].replace('.0', '');
@@ -59,7 +59,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
       });
 
       // 2. Data Normalization & Specific Rules
-      
+
       // Gender: normalize to full words if possible
       // Gender: robust normalization to "Male" or "Female"
       let isFemale = false;
@@ -84,24 +84,29 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
       }
 
       // 3. New Business Rules & Automated Logic
-      
+
       // A. Mother's Name fallback
       if (!student.motherName) student.motherName = 'NA';
-      
+
       // B. Batch & Section defaults
       if (!student.batch) student.batch = 'Sem 1';
       if (!student.section) student.section = 'A';
 
-      // C. Category (Scheme) Logic based on globalCategory
-      if (globalCategory === 'GIA') {
+      // Use row-specific globalCategory if available (from merged files)
+      const rowCategory = rawRow._globalCategory || globalCategory;
+
+      if (rowCategory === 'GIA') {
         student.category = isFemale ? 'GIA Girls' : 'GIA Boys';
-      } else if (globalCategory === 'SFS') {
+      } else if (rowCategory === 'SFS') {
         student.category = isFemale ? 'SFS Girls' : 'SFS Boys';
       } else {
-        // Fallback just in case
-        student.category = isFemale ? 'SFS Girls' : 'SFS Boys';
+        student.category = isFemale ? 'SFS Girls' : 'SFS Boys'; // Fallback
       }
-      
+
+      // Preserve hidden meta-fields for ERP push
+      if (rawRow._courseInfo) student._courseInfo = rawRow._courseInfo;
+      if (rawRow._sourceFileId) student._sourceFileId = rawRow._sourceFileId;
+
       // D. Final Override: Standardization for ERP Target
       if (erpCourseInfo) {
         student.course = erpCourseInfo.name;
@@ -120,11 +125,23 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
     .map((student, originalIndex) => ({ student, originalIndex }))
     .filter(({ student }) => {
       if (!searchTerm) return true;
-      return Object.values(student).some((val) => 
-        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      const term = searchTerm.toLowerCase();
+      return Object.values(student).some(val =>
+        String(val).toLowerCase().includes(term)
       );
     })
     .slice(0, 50);
+
+  const duplicateRegNos = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    workingData.forEach(student => {
+      const regNo = student.regNo;
+      if (regNo) {
+        counts[regNo] = (counts[regNo] || 0) + 1;
+      }
+    });
+    return Object.keys(counts).filter(regNo => counts[regNo] > 1);
+  }, [workingData]);
 
   const handleCellEdit = (index: number, key: string, newValue: string) => {
     setWorkingData(prev => {
@@ -137,10 +154,18 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
   const handleAddToERP = async (originalIndex: number) => {
     const student = workingData[originalIndex];
     setStatusMap(prev => ({ ...prev, [originalIndex]: 'loading' }));
-    
+
     try {
-      const payload = { ...INITIAL_PAYLOAD_DEFAULTS, ...student };
+      const payloadCourseName = student._courseInfo ? student._courseInfo.name : (erpCourseInfo ? erpCourseInfo.name : '');
+      const payloadStream = student._courseInfo ? student._courseInfo.stream : (erpCourseInfo ? erpCourseInfo.stream : '');
       
+      const payload = { ...INITIAL_PAYLOAD_DEFAULTS, ...student, course: payloadCourseName, stream: payloadStream };
+      
+      // Remove meta-fields before showing to user
+      const sourceFileId = student._sourceFileId;
+      delete payload._courseInfo;
+      delete payload._sourceFileId;
+
       // The ERP backend (Mongoose) requires Date fields in YYYY-MM-DD (ISO) format.
       // Convert our UI DD-MM-YYYY format back to YYYY-MM-DD for the API payload.
       const convertToISO = (dateStr: string) => {
@@ -157,10 +182,11 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
 
       await addStudent(payload);
       setStatusMap(prev => ({ ...prev, [originalIndex]: 'success' }));
-      
-      if (activeFileId && payload.regNo && onStudentPushed) {
+
+      const fileToPush = sourceFileId || (activeFileIds.length > 0 ? activeFileIds[0] : null);
+      if (fileToPush && payload.regNo && onStudentPushed) {
         try {
-          await markStudentAsPushed(activeFileId, payload.regNo);
+          await markStudentAsPushed(fileToPush, payload.regNo);
           onStudentPushed(payload.regNo);
         } catch (err) {
           console.error("Failed to mark student as pushed in DB", err);
@@ -173,13 +199,14 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
   };
 
 
-// ... (Inside DataPreview component)
+  // ... (Inside DataPreview component)
   const handleDownloadExcel = () => {
     const exportData = workingData.map(student => {
       const row: any = {};
       ERP_FIELDS.forEach(field => {
         row[field.key] = student[field.key] || '';
       });
+      row['Is Duplicate'] = student.regNo && duplicateRegNos.includes(student.regNo) ? 'Yes' : 'No';
       return row;
     });
 
@@ -198,11 +225,12 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
       row['currentStage'] = '';
       row['userMobile'] = '';
       row['userName'] = '';
-      
+
       const fieldsToKeep = ['course', 'stream', 'batch', 'section', 'oldNew', 'category', 'name', 'dob', 'gender', 'phone', 'fatherName', 'motherName'];
       fieldsToKeep.forEach(key => {
         row[key] = student[key] || '';
       });
+      row['Is Duplicate'] = student.regNo && duplicateRegNos.includes(student.regNo) ? 'Yes' : 'No';
 
       return row;
     });
@@ -218,35 +246,35 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
       {/* Search Header */}
       <div style={{ padding: '32px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '4px' }}>
-              <Edit3 size={14} />
-              <span style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>Manual Review & Edit</span>
-           </div>
-           <h3 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Active Buffer Staging</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '4px' }}>
+            <Edit3 size={14} />
+            <span style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>Manual Review & Edit</span>
+          </div>
+          <h3 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Active Buffer Staging</h3>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
-            onClick={handleDownloadApplicationData} 
-            className="btn-secondary" 
+          <button
+            onClick={handleDownloadApplicationData}
+            className="btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontSize: '13px', fontWeight: 700 }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             Export App Data
           </button>
-          <button 
-            onClick={handleDownloadExcel} 
-            className="btn-secondary" 
+          <button
+            onClick={handleDownloadExcel}
+            className="btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontSize: '13px', fontWeight: 700 }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             Export Excel
           </button>
-          
+
           <div style={{ position: 'relative', width: '300px' }}>
             <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Search records..."
               className="input-field"
               style={{ paddingLeft: '44px' }}
@@ -271,11 +299,11 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
                   </div>
                 </th>
               ))}
-              <th style={{ 
-                textAlign: 'right', 
-                position: 'sticky', 
-                right: 0, 
-                backgroundColor: 'var(--bg-main)', 
+              <th style={{
+                textAlign: 'right',
+                position: 'sticky',
+                right: 0,
+                backgroundColor: 'var(--bg-main)',
                 boxShadow: '-4px 0 10px rgba(0,0,0,0.05)',
                 zIndex: 10
               }}>EXECUTION</th>
@@ -286,21 +314,22 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
               {filteredIndices.map(({ student, originalIndex }) => {
                 const isPushed = pushedRegistrationNumbers?.includes(student.regNo);
                 const status = statusMap[originalIndex] || (isPushed ? 'success' : 'idle');
-                
+                const isDuplicate = student.regNo && duplicateRegNos.includes(student.regNo);
+
                 return (
-                  <motion.tr 
+                  <motion.tr
                     key={originalIndex}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    style={{ 
-                      background: status === 'success' ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
+                    style={{
+                      background: status === 'success' ? 'rgba(16, 185, 129, 0.05)' : isDuplicate ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
                       transition: 'background 0.3s'
                     }}
                   >
                     <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{originalIndex + 1}</td>
                     {ERP_FIELDS.map(field => (
-                      <td key={field.key} style={{ padding: '4px', minWidth: '120px' }}>
-                        <input 
+                      <td key={field.key} style={{ padding: '4px', minWidth: '120px', position: 'relative' }}>
+                        <input
                           type="text"
                           value={student[field.key]}
                           onChange={(e) => handleCellEdit(originalIndex, field.key, e.target.value)}
@@ -309,7 +338,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
                             width: '100%',
                             background: 'transparent',
                             border: '1px solid transparent',
-                            color: 'var(--text-primary)',
+                            color: isDuplicate && field.key === 'regNo' ? '#ef4444' : 'var(--text-primary)',
                             padding: '8px',
                             borderRadius: '8px',
                             fontSize: '12px',
@@ -320,13 +349,16 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
                           onFocus={(e) => { e.target.style.background = 'rgba(255,255,255,0.02)'; e.target.style.borderColor = 'rgba(255,255,255,0.05)'; }}
                           onBlur={(e) => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'transparent'; }}
                         />
+                        {field.key === 'regNo' && isDuplicate && (
+                          <span style={{ position: 'absolute', top: '10px', right: '12px', fontSize: '9px', background: '#ef4444', color: 'white', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold' }}>DUP</span>
+                        )}
                       </td>
                     ))}
-                    <td style={{ 
-                      textAlign: 'right', 
-                      position: 'sticky', 
-                      right: 0, 
-                      backgroundColor: 'var(--bg-card)', 
+                    <td style={{
+                      textAlign: 'right',
+                      position: 'sticky',
+                      right: 0,
+                      backgroundColor: 'var(--bg-card)',
                       boxShadow: '-4px 0 10px rgba(0,0,0,0.05)',
                       zIndex: 10
                     }}>
@@ -366,14 +398,14 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
           </tbody>
         </table>
       </div>
-      
+
       {/* Buffer Status */}
       <div style={{ padding: '16px 32px', background: 'var(--bg-main)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', margin: 0, letterSpacing: '1px' }}>B_BATCH_050</p>
-         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)' }}></div>
-            <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--accent)' }}>SYNC_READY</span>
-         </div>
+        <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', margin: 0, letterSpacing: '1px' }}>B_BATCH_050</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)' }}></div>
+          <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--accent)' }}>SYNC_READY</span>
+        </div>
       </div>
     </div>
   );

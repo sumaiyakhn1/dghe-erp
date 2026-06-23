@@ -227,6 +227,26 @@ app.put('/api/files/:fileId/push', authenticate, async (req, res) => {
   }
 });
 
+// Save configuration (Course/Category) for a file
+app.put('/api/files/:fileId/config', authenticate, async (req, res) => {
+  try {
+    if (!db) return res.status(500).json({ error: "Database not connected" });
+    const fileId = req.params.fileId;
+    const { courseId, category } = req.body;
+
+    const collection = db.collection('entity_files');
+    const result = await collection.updateOne(
+      { _id: new ObjectId(fileId) },
+      { $set: { courseId, category } }
+    );
+    
+    if (result.matchedCount === 0) return res.status(404).json({ error: "File not found" });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Server
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);

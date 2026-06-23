@@ -40,7 +40,7 @@ function App() {
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [isSavingData, setIsSavingData] = useState(false);
 
-  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [activeFileIds, setActiveFileIds] = useState<string[]>([]);
   const [pushedRegistrationNumbers, setPushedRegistrationNumbers] = useState<string[]>([]);
 
   useEffect(() => {
@@ -59,12 +59,12 @@ function App() {
           try {
             setIsLoadingCourses(true);
             const response = await getCourses(selectedEntity.entityId, selectedEntity.session);
-            
+
             let courses = [];
             if (Array.isArray(response)) courses = response;
             else if (response && Array.isArray(response.data)) courses = response.data;
             else if (response && response.data && Array.isArray(response.data.data)) courses = response.data.data;
-            
+
             setErpCourses(courses);
           } catch (error) {
             console.error("Error fetching courses:", error);
@@ -139,24 +139,50 @@ function App() {
     setSelectedEntity(entity);
     setFileName(null);
     setMappings({});
-    setActiveFileId(null);
+    setActiveFileIds([]);
     setPushedRegistrationNumbers([]);
     setActiveStep('upload');
   };
 
-  const handleLoadSavedFile = async (entity: Entity, fileId: string) => {
+  const handleLoadSavedFiles = async (entity: Entity, fileIds: string[], fileConfigs: Record<string, { courseInfo: any, globalCategory: string }>) => {
     try {
-      // Show loading indicator in some way if needed, or rely on Gateway loading
       setSelectedEntity(entity);
-
       const { getFileData } = await import('./utils/auth');
-      const fileData = await getFileData(fileId);
+      
+      let allExcelData: any[] = [];
+      let allPushedRegNos: string[] = [];
+      let firstMapping = {};
+      let combinedFileName = '';
 
-      setFileName(fileData.fileName);
-      setMappings(fileData.mapping);
-      setExcelData(fileData.excelData);
-      setActiveFileId(fileId);
-      setPushedRegistrationNumbers(fileData.pushedRegistrationNumbers || []);
+      for (let i = 0; i < fileIds.length; i++) {
+        const fileId = fileIds[i];
+        const fileData = await getFileData(fileId);
+        const config = fileConfigs[fileId];
+
+        if (i === 0) {
+          firstMapping = fileData.mapping;
+          combinedFileName = fileIds.length > 1 ? `${fileData.fileName} + ${fileIds.length - 1} more` : fileData.fileName;
+        }
+
+        // Attach config to each row
+        const rowsWithConfig = fileData.excelData.map((row: any) => ({
+          ...row,
+          _courseInfo: config?.courseInfo || null,
+          _globalCategory: config?.globalCategory || null,
+          _sourceFileId: fileId
+        }));
+
+        allExcelData = [...allExcelData, ...rowsWithConfig];
+        if (fileData.pushedRegistrationNumbers) {
+          allPushedRegNos = [...allPushedRegNos, ...fileData.pushedRegistrationNumbers];
+        }
+      }
+
+      setFileName(combinedFileName);
+      setMappings(firstMapping);
+      setExcelData(allExcelData);
+      setActiveFileIds(fileIds);
+      setPushedRegistrationNumbers(allPushedRegNos);
 
       setActiveStep('preview');
     } catch (err) {
@@ -170,7 +196,7 @@ function App() {
     try {
       setIsSavingData(true);
       const savedData = await saveUserFile(selectedEntity._id, fileName || 'Untitled.xlsx', mappings, excelData);
-      setActiveFileId(savedData.fileId);
+      setActiveFileIds([savedData.fileId]);
       setPushedRegistrationNumbers([]);
       setIsSavingData(false);
       alert('Data and Mapping Saved to Workspace!');
@@ -290,7 +316,7 @@ function App() {
                   <EntitiesDashboard
                     initialActiveEntity={selectedEntity}
                     onUploadNewFile={handleEntitySelect}
-                    onLoadSavedFile={handleLoadSavedFile}
+                    onLoadSavedFiles={handleLoadSavedFiles}
                   />
                 )}
 
@@ -366,18 +392,18 @@ function App() {
                               )}
                             </div>
                           </div>
-                          
+
                           <div style={{ flex: 1, minWidth: '300px' }}>
                             <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 16px 0' }}>Select Global Category</h3>
                             <select
-                                value={globalCategory}
-                                onChange={(e) => setGlobalCategory(e.target.value)}
-                                className="input-field"
-                                style={{ maxWidth: '400px' }}
-                              >
-                                <option value="">-- Select Category --</option>
-                                <option value="SFS">SFS</option>
-                                <option value="GIA">GIA</option>
+                              value={globalCategory}
+                              onChange={(e) => setGlobalCategory(e.target.value)}
+                              className="input-field"
+                              style={{ maxWidth: '400px' }}
+                            >
+                              <option value="">-- Select Category --</option>
+                              <option value="SFS">SFS</option>
+                              <option value="GIA">GIA</option>
                             </select>
                           </div>
                         </div>
@@ -400,7 +426,7 @@ function App() {
                       valueMappings={selectedEntity?.valueMappings}
                       erpCourseInfo={courseInfo}
                       globalCategory={globalCategory}
-                      activeFileId={activeFileId}
+                      activeFileIds={activeFileIds}
                       pushedRegistrationNumbers={pushedRegistrationNumbers}
                       onStudentPushed={(regNo) => setPushedRegistrationNumbers(prev => [...prev, regNo])}
                     />

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, LayoutGrid, Loader2, ArrowRight, FileSpreadsheet, ArrowLeft, Calendar, Trash2 } from 'lucide-react';
-import { getEntities, createEntity, getEntityFiles, deleteEntity, deleteUserFile } from '../utils/auth';
+import { getEntities, createEntity, getEntityFiles, deleteEntity, deleteUserFile, getCourses, saveFileConfig } from '../utils/auth';
 import type { Entity } from '../utils/auth';
 import { MappingSetup } from './MappingSetup';
-
 interface EntitiesDashboardProps {
   onUploadNewFile: (entity: Entity) => void;
-  onLoadSavedFile: (entity: Entity, fileId: string) => void;
+  onLoadSavedFiles: (entity: Entity, fileIds: string[], fileConfigs: Record<string, { courseInfo: any, globalCategory: string }>) => void;
   initialActiveEntity?: Entity | null;
 }
 
-export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNewFile, onLoadSavedFile, initialActiveEntity }) => {
+export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNewFile, onLoadSavedFiles, initialActiveEntity }) => {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -26,6 +25,16 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
   const [entityFiles, setEntityFiles] = useState<any[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [showMapping, setShowMapping] = useState(false);
+
+  const [erpCourses, setErpCourses] = useState<any[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+
+  // Per-file configuration
+  const [fileConfigs, setFileConfigs] = useState<Record<string, { courseId: string, category: string }>>({});
+  const [editingFileId, setEditingFileId] = useState<string | null>(null);
+  const [tempCourseId, setTempCourseId] = useState<string>('');
+  const [tempCategory, setTempCategory] = useState<string>('');
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetchEntities();
@@ -73,9 +82,35 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
   const handleSelectEntity = async (entity: Entity) => {
     setActiveEntity(entity);
     setLoadingFiles(true);
+    setFileConfigs({});
+    setSelectedFileIds([]);
+    setEditingFileId(null);
+    
+    // Fetch courses
+    try {
+      setIsLoadingCourses(true);
+      const response = await getCourses(entity.entityId, entity.session);
+      let courses = [];
+      if (Array.isArray(response)) courses = response;
+      else if (response && Array.isArray(response.data)) courses = response.data;
+      else if (response && response.data && Array.isArray(response.data.data)) courses = response.data.data;
+      setErpCourses(courses);
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+    } finally {
+      setIsLoadingCourses(false);
+    }
+
     try {
       const files = await getEntityFiles(entity._id);
       setEntityFiles(files);
+      const initialConfigs: any = {};
+      files.forEach((f: any) => {
+        if (f.courseId && f.category) {
+          initialConfigs[f._id] = { courseId: f.courseId, category: f.category };
+        }
+      });
+      setFileConfigs(initialConfigs);
     } catch (err) {
       console.error("Failed to load files", err);
     } finally {
@@ -112,14 +147,14 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
   if (activeEntity) {
     if (showMapping) {
       return (
-        <MappingSetup 
-          entity={activeEntity} 
-          onBack={() => setShowMapping(false)} 
+        <MappingSetup
+          entity={activeEntity}
+          onBack={() => setShowMapping(false)}
           onMappingSaved={(updatedEntity) => {
             setActiveEntity(updatedEntity);
             setEntities(entities.map(e => e._id === updatedEntity._id ? updatedEntity : e));
             setShowMapping(false);
-          }} 
+          }}
         />
       );
     }
@@ -137,14 +172,32 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
+            <button
               onClick={() => setShowMapping(true)}
               className="btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', background: 'transparent', border: '1px solid var(--border)' }}
             >
               View & Edit Mapping
             </button>
-            <button 
+            {selectedFileIds.length > 1 && (
+              <button
+                onClick={() => {
+                  const mappedConfigs: Record<string, { courseInfo: any, globalCategory: string }> = {};
+                  selectedFileIds.forEach(id => {
+                    mappedConfigs[id] = {
+                      courseInfo: erpCourses.find(c => c._id === fileConfigs[id]?.courseId),
+                      globalCategory: fileConfigs[id]?.category
+                    };
+                  });
+                  onLoadSavedFiles(activeEntity, selectedFileIds, mappedConfigs);
+                }}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', background: '#10b981' }}
+              >
+                Merge & Preview ({selectedFileIds.length})
+              </button>
+            )}
+            <button
               onClick={() => onUploadNewFile(activeEntity)}
               className="btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
@@ -160,17 +213,19 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-            {entityFiles.map(file => (
+            {entityFiles.map(file => {
+              const isConfigured = !!fileConfigs[file._id];
+              const isEditing = editingFileId === file._id;
+              
+              return (
               <motion.div
                 key={file._id}
                 whileHover={{ translateY: -4, boxShadow: '0 12px 30px -10px rgba(0,0,0,0.1)' }}
-                onClick={() => onLoadSavedFile(activeEntity, file._id)}
                 style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
+                  background: isConfigured ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-card)',
+                  border: isConfigured ? '1px solid #10b981' : '1px solid var(--border)',
                   borderRadius: '20px',
                   padding: '24px',
-                  cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -179,33 +234,122 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                    <div style={{ width: '40px', height: '40px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <FileSpreadsheet size={20} />
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 4px 0', wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{file.fileName}</h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600 }}>
-                        <Calendar size={12} />
-                        {new Date(file.createdAt).toLocaleDateString()}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', background: isConfigured ? '#10b981' : 'rgba(16, 185, 129, 0.1)', color: isConfigured ? 'white' : '#10b981', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileSpreadsheet size={20} />
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 4px 0', wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{file.fileName}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600 }}>
+                          <Calendar size={12} />
+                          {new Date(file.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
+                    {isConfigured && (
+                      <div onClick={(e) => { e.stopPropagation(); }}>
+                        <input 
+                          type="checkbox" 
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                          checked={selectedFileIds.includes(file._id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedFileIds(prev => [...prev, file._id]);
+                            else setSelectedFileIds(prev => prev.filter(id => id !== file._id));
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                  <button 
-                    onClick={(e) => handleDeleteFile(e, file._id)}
-                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
-                    title="Delete File"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    LOAD DATA <ArrowRight size={14} />
-                  </span>
-                </div>
+
+                {isEditing ? (
+                  <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '12px', marginTop: '16px' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>COURSE</label>
+                      <select value={tempCourseId} onChange={(e) => setTempCourseId(e.target.value)} className="input-field" style={{ padding: '8px', fontSize: '12px', height: 'auto' }}>
+                        <option value="">Select Course</option>
+                        {erpCourses.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>CATEGORY</label>
+                      <select value={tempCategory} onChange={(e) => setTempCategory(e.target.value)} className="input-field" style={{ padding: '8px', fontSize: '12px', height: 'auto' }}>
+                        <option value="">Select Category</option>
+                        <option value="SFS">SFS</option>
+                        <option value="GIA">GIA</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => setEditingFileId(null)}
+                        style={{ flex: 1, padding: '8px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        disabled={!tempCourseId || !tempCategory}
+                        onClick={async () => {
+                          try {
+                            await saveFileConfig(file._id, tempCourseId, tempCategory);
+                            setFileConfigs(prev => ({ ...prev, [file._id]: { courseId: tempCourseId, category: tempCategory } }));
+                            setEditingFileId(null);
+                          } catch (err) {
+                            console.error("Failed to save config", err);
+                            alert("Failed to save the configuration to the database.");
+                          }
+                        }}
+                        style={{ flex: 1, padding: '8px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: (!tempCourseId || !tempCategory) ? 'not-allowed' : 'pointer', opacity: (!tempCourseId || !tempCategory) ? 0.5 : 1 }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
+                    <button
+                      onClick={(e) => handleDeleteFile(e, file._id)}
+                      style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                      title="Delete File"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    
+                    {isConfigured ? (
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setTempCourseId(fileConfigs[file._id].courseId); setTempCategory(fileConfigs[file._id].category); setEditingFileId(file._id); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600 }}
+                        >
+                          EDIT
+                        </button>
+                        <button
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            onLoadSavedFiles(activeEntity, [file._id], { [file._id]: { courseInfo: erpCourses.find(c => c._id === fileConfigs[file._id].courseId), globalCategory: fileConfigs[file._id].category } }); 
+                          }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                        >
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            LOAD DATA <ArrowRight size={14} />
+                          </span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTempCourseId(''); setTempCategory(''); setEditingFileId(file._id); }}
+                        style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer' }}
+                      >
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          CONFIGURE
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </motion.div>
-            ))}
+            )})}
+
             {entityFiles.length === 0 && (
               <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
                 <FileSpreadsheet size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
