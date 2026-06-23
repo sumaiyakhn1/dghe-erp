@@ -4,7 +4,7 @@ import { ERP_FIELDS, INITIAL_PAYLOAD_DEFAULTS } from '../constants/erpFields';
 import { formatExcelDate } from '../utils/excelUtils';
 import { addStudent, markStudentAsPushed } from '../utils/auth';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 interface DataPreviewProps {
   data: any[];
@@ -206,11 +206,38 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
       ERP_FIELDS.forEach(field => {
         row[field.key] = student[field.key] || '';
       });
-      row['Is Duplicate'] = student.regNo && duplicateRegNos.includes(student.regNo) ? 'Yes' : 'No';
       return row;
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
+    
+    // Apply styling to duplicate rows
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const studentIndex = R - 1; // offset by 1 for header
+      if (studentIndex >= 0 && studentIndex < workingData.length) {
+        const student = workingData[studentIndex];
+        const isDuplicate = student.regNo && duplicateRegNos.includes(student.regNo);
+        
+        if (isDuplicate) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = {c: C, r: R};
+            const cellRef = XLSX.utils.encode_cell(cellAddress);
+            if (!worksheet[cellRef]) continue;
+            
+            worksheet[cellRef].s = {
+              fill: {
+                fgColor: { rgb: "FFFFCCCC" } // Light red background
+              },
+              font: {
+                color: { rgb: "FFFF0000" } // Red text
+              }
+            };
+          }
+        }
+      }
+    }
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Mapped Data");
     XLSX.writeFile(workbook, "Mapped_Students.xlsx");
@@ -230,12 +257,39 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, mappings, valueM
       fieldsToKeep.forEach(key => {
         row[key] = student[key] || '';
       });
-      row['Is Duplicate'] = student.regNo && duplicateRegNos.includes(student.regNo) ? 'Yes' : 'No';
 
       return row;
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
+    
+    // Apply styling to duplicate rows
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const studentIndex = R - 1; // offset by 1 for header
+      if (studentIndex >= 0 && studentIndex < workingData.length) {
+        const student = workingData[studentIndex];
+        const isDuplicate = student.regNo && duplicateRegNos.includes(student.regNo);
+        
+        if (isDuplicate) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = {c: C, r: R};
+            const cellRef = XLSX.utils.encode_cell(cellAddress);
+            if (!worksheet[cellRef]) continue;
+            
+            worksheet[cellRef].s = {
+              fill: {
+                fgColor: { rgb: "FFFFCCCC" }
+              },
+              font: {
+                color: { rgb: "FFFF0000" }
+              }
+            };
+          }
+        }
+      }
+    }
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Application Data");
     XLSX.writeFile(workbook, "Application_Data.xlsx");

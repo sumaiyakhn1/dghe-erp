@@ -27,7 +27,6 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
   const [showMapping, setShowMapping] = useState(false);
 
   const [erpCourses, setErpCourses] = useState<any[]>([]);
-  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
 
   // Per-file configuration
   const [fileConfigs, setFileConfigs] = useState<Record<string, { courseId: string, category: string }>>({});
@@ -88,7 +87,6 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
     
     // Fetch courses
     try {
-      setIsLoadingCourses(true);
       const response = await getCourses(entity.entityId, entity.session);
       let courses = [];
       if (Array.isArray(response)) courses = response;
@@ -97,8 +95,6 @@ export const EntitiesDashboard: React.FC<EntitiesDashboardProps> = ({ onUploadNe
       setErpCourses(courses);
     } catch (err) {
       console.error("Error fetching courses:", err);
-    } finally {
-      setIsLoadingCourses(false);
     }
 
     try {
