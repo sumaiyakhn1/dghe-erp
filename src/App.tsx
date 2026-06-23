@@ -191,7 +191,7 @@ function App() {
     }
   };
 
-  const handleContinueToGateway = async () => {
+  const handleSaveData = async (action: 'preview' | 'entities') => {
     if (!selectedEntity || !fileName) return;
     try {
       setIsSavingData(true);
@@ -205,11 +205,19 @@ function App() {
       setPushedRegistrationNumbers([]);
       setIsSavingData(false);
       alert('Data and Mapping Saved to Workspace!');
-      setActiveStep('preview');
+      if (action === 'preview') {
+        setActiveStep('preview');
+      } else {
+        // Go back to the dashboard of the entity
+        setActiveStep('entities');
+        // Reset file name and mappings so we return clean
+        setFileName(null);
+        setMappings({});
+      }
     } catch (err) {
       console.error('Failed to save user data:', err);
       alert('Failed to save your work to the database. Proceeding anyway...');
-      setActiveStep('preview');
+      setActiveStep(action === 'preview' ? 'preview' : 'entities');
     } finally {
       setIsSavingData(false);
     }
@@ -354,11 +362,19 @@ function App() {
                         <button onClick={handleReset} className="btn-secondary">Change Source</button>
                         <button
                           disabled={!isMappingValid() || isSavingData}
-                          onClick={handleContinueToGateway}
+                          onClick={() => handleSaveData('entities')}
+                          className="btn-secondary"
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: isSavingData ? 0.7 : 1 }}
+                        >
+                          {isSavingData ? <Loader2 size={16} className="animate-spin" /> : 'Save & Go to Excels'}
+                        </button>
+                        <button
+                          disabled={!isMappingValid() || isSavingData}
+                          onClick={() => handleSaveData('preview')}
                           className="btn-primary"
                           style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: isSavingData ? 0.7 : 1 }}
                         >
-                          {isSavingData ? <Loader2 size={16} className="animate-spin" /> : 'Continue to Gateway'}
+                          {isSavingData ? <Loader2 size={16} className="animate-spin" /> : 'Save & Open Preview'}
                         </button>
                       </div>
                     </div>
@@ -368,7 +384,7 @@ function App() {
                         <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
                           <div style={{ flex: 1, minWidth: '300px' }}>
                             <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 16px 0' }}>Select Target ERP Course</h3>
-                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                               {isLoadingCourses ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 20px', background: 'var(--bg-input)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                                   <Loader2 size={18} className="animate-spin" color="var(--accent)" />
@@ -379,21 +395,13 @@ function App() {
                                   value={selectedCourseId}
                                   onChange={(e) => handleCourseSelect(e.target.value)}
                                   className="input-field"
-                                  style={{ flex: 1, maxWidth: '400px' }}
+                                  style={{ flex: 1, minWidth: '250px', maxWidth: '400px', textOverflow: 'ellipsis' }}
                                 >
                                   <option value="">-- Select Course From ERP --</option>
                                   {erpCourses.map(c => (
                                     <option key={c._id} value={c._id}>{c.name}</option>
                                   ))}
                                 </select>
-                              )}
-                              {courseInfo && (
-                                <div style={{ padding: '12px 24px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                  <div>
-                                    <span style={{ fontSize: '9px', fontWeight: 900, color: '#059669', display: 'block', marginBottom: '2px' }}>ERP TARGET</span>
-                                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>{courseInfo.name}</span>
-                                  </div>
-                                </div>
                               )}
                             </div>
                           </div>
